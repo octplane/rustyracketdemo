@@ -1,3 +1,5 @@
+## Definitely not working yet.
+
 A demo of embedding Rust in Racket.
 
 PORTED FROM BRSON'S RUBYRUSTDEMO.
