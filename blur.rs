@@ -31,7 +31,7 @@ macro_rules! rtdebug_ (
 fn blur_rust(width: uint, height: uint, data: &[u8]) -> ~[u8] {
 
     let filter = [[0.011, 0.084, 0.011],
-                  [0.084, 0.619, 0.084],
+                  [0.084, 0.620, 0.084],
                   [0.011, 0.084, 0.011]];
 
     let mut newdata = ~[];

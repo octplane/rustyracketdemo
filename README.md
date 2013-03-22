@@ -1,12 +1,11 @@
-## Definitely not working yet.
+## A demo of embedding Rust in Racket.
 
-A demo of embedding Rust in Racket.
+This demo is ported from Brian Anderson's Ruby+Rust demo. Indeed, it's a fork of his github repo.
+Here's [my github repo](http://www.github.com/jbclements/rustyracketdemo/).
 
-PORTED FROM BRSON'S RUBYRUSTDEMO.
 
 ```
 rustc blur.rs -O
-LD_LIBRARY_PATH=. ruby blur.rb
+racket blur.rkt
 ```
 
-Then browse to localhost:4567

@@ -2,119 +2,86 @@
 
 (require json
          web-server/servlet-env
-         web-server/servlet/web
-         web-server/http/xexpr
          racket/runtime-path
          web-server/dispatch
          web-server/http/request-structs
          web-server/http/response-structs
          racket/match
-         )
+         ffi/unsafe
+         ffi/cvector)
 
 (define-runtime-path here ".")
 
-(define (pre-dispatch request)
-  (printf "received request\n")
-  (dispatch request))
-
+;; define the dispatcher
 (define-values (dispatch blog-url)
   (dispatch-rules
-   [("blur" (string-arg)) #:method "post" foo]))
+   [("blur" (string-arg)) #:method "post" decode]))
 
-(define (foo request kind)
-  (printf "got a request!\n")
-  (define post-bytes (request-post-data/raw request))
-  (printf "post data is of length ~s.\n" (bytes-length post-bytes))
-  (printf "first 100 bytes: ~s\n" (subbytes post-bytes 0 100))
-  (define img-json (bytes->jsexpr post-bytes))
-  (printf "image: ~e\n" img-json)
-  (define result (blur img-json racket-blur))
+;; unpack the args and call the right function.
+(define (decode request kind)
+  (define img (bytes->jsexpr (request-post-data/raw request)))
+  (define backend
+    (match kind
+      ["rust" rust-blur]
+      ["racket" racket-blur]))
+  (match-define (hash-table ('width width) ('height height) ('data data)) img)
+  (define start-time (current-inexact-milliseconds))
+  (define new-bytes (backend width height data))
+  ;; ignoring the possibility of millisecond rollover:
+  (define time-taken (/ (- (current-inexact-milliseconds) start-time) 1000.0))
+  (define result
+    `#hasheq((width . ,width) (height . ,height) (time . ,time-taken) (data . ,new-bytes)))
   (response/full
    200 #"Okay" (current-seconds) #"application/json; charset=utf-8"
    null
    (list (jsexpr->bytes result))))
 
-;; jsexpr->jsexpr : do the monochromatic blur in racket
-(define (blur img fun)
-  (match-define (hash-table ('width width) ('height height) ('data data)) img)
-  (define start-time (current-inexact-milliseconds))
-  (define newdata (fun width height data))
-  (define time-taken (- (current-inexact-milliseconds) start-time))
-  '#hasheq((data . newdata) (time . time-taken)))
+;; the gaussian filter used in the racket blur.
+;; boosted center value by 1/1000 to make sure that whites stay white.
+(define filter '[[0.011 0.084 0.011]
+                 [0.084 0.620 0.084]
+                 [0.011 0.084 0.011]])
 
+;; racket-blur: blur the image using the gaussian filter
+;; number number list-of-bytes -> vector-of-bytes
 (define (racket-blur width height data)
-  (jsexpr->bytes #'((width . 200) (height . 200) (data . "oops"))))
+  (define data-vec (list->vector data))
+  ;; ij->offset : compute the offset of the pixel data within the buffer
+  (define (ij->offset i j)
+    (+ i (* j width)))
+  (define bytes-len (* width height))
+  (define new-bytes (make-vector bytes-len 0))
+  (define filter-x (length (car filter)))
+  (define filter-y (length filter))
+  (define offset-x (/ (sub1 filter-x) 2))
+  (define offset-y (/ (sub1 filter-y) 2))
+  ;; compute the filtered byte array
+  (for* ([x width]
+         [y height])
+    (define new-val
+      (for*/fold ([sum 0.0])
+        ([dx filter-x]
+         [dy filter-y])
+        (define sample-x (modulo (+ dx (- x offset-x)) width))
+        (define sample-y (modulo (+ dy (- y offset-y)) height))
+        (define sample-value (vector-ref data-vec (ij->offset sample-x sample-y)))
+        (define weight (list-ref (list-ref filter dy) dx))
+        (+ sum (* weight sample-value))))
+    (vector-set! new-bytes (ij->offset x y) new-val))  
+  (vector->list new-bytes))
 
+
+;; link to the rust library:
+(define rust-lib (ffi-lib (build-path here "libblur-68a2c114141ca-0.0")))
+(define rust-blur-fun (get-ffi-obj "blur" rust-lib (_fun _uint _uint _cvector -> _void)))
+
+(define (rust-blur width height data)
+  (define cvec (list->cvector data _byte))
+  (rust-blur-fun width height cvec)
+  (cvector->list cvec))
 
 (serve/servlet
- pre-dispatch
+ dispatch
  #:extra-files-paths (list (build-path here "htdocs"))
  #:servlet-path "/"
  #:servlet-regexp #rx"")
-
-#|
-def blur
-  msg = request.body.read
-  msg = JSON.parse msg
-
-  width = msg['width']
-  height = msg['height']
-  data = msg['data']
-
-  if (data.length != width * height)
-    return
-  end
-
-  start_time = Time.now()
-  newdata = yield(width, height, data)
-  end_time = Time.now() - start_time
-  logger.info end_time
-
-  response = { :data => newdata, :time => end_time }
-  JSON.generate(response)
-end
-
-def blur_ruby(width, height, data)
-
-  filter = [[0.011, 0.084, 0.011],
-            [0.084, 0.619, 0.084],
-            [0.011, 0.084, 0.011]]
-
-  newdata = []             
-
-  # Iterate through the pixels of the image
-  (0...height).each do |y|
-    (0...width).each do |x|
-      new_value = 0
-      # Iterate through the values in the filter
-      (0...filter.length).each do |yy|
-        (0...filter.length).each do |xx|
-          x_sample = x - (filter.length - 1) / 2 + xx
-          y_sample = y - (filter.length - 1) / 2 + yy
-          sample_value = data[width * (y_sample % height) + (x_sample % width)]
-          weight = filter[yy][xx]
-          new_value += sample_value * weight
-        end
-      end
-      newdata[width * y + x] = new_value
-    end
-  end
-
-  newdata
-end
-
-def blur_rust(width, height, data)
-  packed_data = data.pack("C*")
-  raw_data = FFI::MemoryPointer.from_string(packed_data)
-  RustBlur.blur(width, height, raw_data)
-  
-  raw_data.get_bytes(0, width * height).unpack("C*")
-end
-
-module RustBlur
-  extend FFI::Library
-  ffi_lib 'libblur-68a2c114141ca-0.0'
-
-  attach_function :blur, :blur, [ :uint, :uint, :pointer ], :void
-end
-|#

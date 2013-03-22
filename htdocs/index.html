@@ -10,6 +10,11 @@ border: 1px solid gray;
 
 <body>
 
+<h2>Instructions</h2>
+<p>Draw something in the box using the mouse. Then click one of the two buttons to blur it!</p>
+
+<canvas id="surface" width="200" height="200"></canvas>
+
 <div>
 <button id="racket-blur">racket blur</button>
 <button id="rust-blur">rust blur</button>
@@ -18,8 +23,6 @@ border: 1px solid gray;
 <div>
   Time: <span id="time"></span>
 </div>
-
-<canvas id="surface" width="200" height="200"></canvas>
 
 <script src="jquery-1.9.1.min.js"></script>
 <script src="script.js"></script>

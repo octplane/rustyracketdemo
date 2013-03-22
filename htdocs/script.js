@@ -70,7 +70,6 @@ $(document).ready(function() {
         var data = podifyImageData(data);
         var data = JSON.stringify(data);
         $.post('/blur/' + backend, data, function(newData) {
-          var newData = JSON.parse(newData.data);
             var data = context.createImageData(canvas.width(), canvas.height());
             for (x = 0; x < data.width * data.height; x++) {
                 data.data[x * 4 + 0] = newData.data[x];
