@@ -2,17 +2,25 @@
 
 (require json
          web-server/servlet-env
+         web-server/servlet/web
+         web-server/http/xexpr
+         racket/runtime-path
+         web-server/dispatch
          )
 
-(define (start req)
-  (start
-   (send/suspend
-    (lambda (k-url)
-      (response/xexpr
-       `(html (body (a ([href ,k-url]) "Hello world!"))))))))
+(define-runtime-path here ".")
+
+(define-values (dispatch blog-url)
+  (dispatch-rules
+   ))
+
 
 (serve/servlet
- start)
+ dispatch
+ #:extra-files-paths (list (build-path here "htdocs"))
+ #:servlet-path "/"
+ #:servlet-regexp #rx""
+ )
 
 #|
 # Make our POST data limits really big to accomodate the image data
