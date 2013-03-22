@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 (require json
          web-server/servlet-env
@@ -6,39 +6,53 @@
          web-server/http/xexpr
          racket/runtime-path
          web-server/dispatch
+         web-server/http/request-structs
+         web-server/http/response-structs
+         racket/match
          )
 
 (define-runtime-path here ".")
 
+(define (pre-dispatch request)
+  (printf "received request\n")
+  (dispatch request))
+
 (define-values (dispatch blog-url)
   (dispatch-rules
-   ))
+   [("blur" (string-arg)) #:method "post" foo]))
+
+(define (foo request kind)
+  (printf "got a request!\n")
+  (define post-bytes (request-post-data/raw request))
+  (printf "post data is of length ~s.\n" (bytes-length post-bytes))
+  (printf "first 100 bytes: ~s\n" (subbytes post-bytes 0 100))
+  (define img-json (bytes->jsexpr post-bytes))
+  (printf "image: ~e\n" img-json)
+  (define result (blur img-json racket-blur))
+  (response/full
+   200 #"Okay" (current-seconds) #"application/json; charset=utf-8"
+   null
+   (list (jsexpr->bytes result))))
+
+;; jsexpr->jsexpr : do the monochromatic blur in racket
+(define (blur img fun)
+  (match-define (hash-table ('width width) ('height height) ('data data)) img)
+  (define start-time (current-inexact-milliseconds))
+  (define newdata (fun width height data))
+  (define time-taken (- (current-inexact-milliseconds) start-time))
+  '#hasheq((data . newdata) (time . time-taken)))
+
+(define (racket-blur width height data)
+  (jsexpr->bytes #'((width . 200) (height . 200) (data . "oops"))))
 
 
 (serve/servlet
- dispatch
+ pre-dispatch
  #:extra-files-paths (list (build-path here "htdocs"))
  #:servlet-path "/"
- #:servlet-regexp #rx""
- )
+ #:servlet-regexp #rx"")
 
 #|
-# Make our POST data limits really big to accomodate the image data
-# serialized to JSON
-Rack::Utils.key_space_limit = 1000000
-
-get '/' do
-  redirect '/index.html'
-end
-
-post '/blur/ruby' do
-  blur { |w, h, d| blur_ruby(w, h, d) }
-end
-
-post '/blur/rust' do
-  blur { |w, h, d| blur_rust(w, h, d) }
-end
-
 def blur
   msg = request.body.read
   msg = JSON.parse msg
