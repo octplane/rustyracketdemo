@@ -3,7 +3,7 @@ use std::os::raw::c_char;
 use std::ffi::CStr;
 
 #[no_mangle]
-pub extern fn blur(n: *const c_char,
+pub extern fn replace(n: *const c_char,
                    h: *const c_char,
                    r: *const c_char) -> *const c_char {
     unsafe {
