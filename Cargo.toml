@@ -5,6 +5,8 @@ authors = ["Pierre Baillet <pierre@baillet.name>"]
 
 [dependencies]
 
+libc = "*"
+
 [lib]
 name = "replace"
 crate-type = ["dylib"]
