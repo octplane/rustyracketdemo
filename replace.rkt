@@ -13,7 +13,8 @@
 (define-runtime-path here ".")
 
 ;; link to the rust library:
-(define rust-lib (ffi-lib (build-path here "libreplace.rlib")))
+(define rust-lib (ffi-lib (build-path here "target/debug/libreplace")))
 (define rust-replace-fun (get-ffi-obj "replace" rust-lib
                                       (_fun _string _string _string -> _string)))
 
+(rust-replace-fun "i" "hihihih" "a")
