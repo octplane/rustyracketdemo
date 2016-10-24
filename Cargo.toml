@@ -6,6 +6,7 @@ authors = ["Pierre Baillet <pierre@baillet.name>"]
 [dependencies]
 
 libc = "*"
+chrono = "*"
 
 [lib]
 name = "replace"
