@@ -1,3 +1,4 @@
+.PHONY: ./target/debug/deps/libreplace.dylib
 
 main: main.o ./target/debug/deps/libreplace.dylib
 	gcc -v main.o ./target/debug/deps/libreplace.dylib -o main
